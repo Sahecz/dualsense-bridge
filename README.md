@@ -18,6 +18,7 @@ Actualmente existe una prueba técnica funcional con:
 - creación de un mando Xbox 360 virtual mediante HIDMaestro;
 - un trabajador continuo con espera, desconexión, limpieza y reconexión automática;
 - simulación de dispositivos para desarrollar sin hardware físico;
+- captura versionada de series HID crudas con metadata segura para validar hardware real;
 - pruebas automatizadas para el parser, el mapeo y el ciclo de vida del puente.
 
 La salida virtual ya fue validada en Windows mediante un dispositivo simulado. La ruta completa con un DualSense físico todavía necesita validarse por USB y Bluetooth antes de considerarse utilizable.
@@ -70,6 +71,7 @@ El núcleo no depende directamente de HidSharp ni de HIDMaestro. Define contrato
 - [x] Salida Xbox virtual funcional.
 - [x] Simulación sin DualSense físico.
 - [x] Ciclo de desconexión y reconexión.
+- [x] Infraestructura para capturar fixtures HID reales.
 - [ ] Validación completa con hardware por USB.
 - [ ] Validación completa con hardware por Bluetooth.
 - [ ] Propagación de vibración desde el juego.

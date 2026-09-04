@@ -1,4 +1,5 @@
 using DualSenseBridge.Core;
+using System.Text.Json;
 
 var tests = new (string Name, Action Run)[]
 {
@@ -9,6 +10,7 @@ var tests = new (string Name, Action Run)[]
     ("interpreta Bluetooth básico", ParsesBasicBluetoothReport),
     ("el simulador repite su secuencia", SimulatorRepeatsItsSequence),
     ("mapea DualSense a Xbox 360", MapsDualSenseToXbox),
+    ("serializa una serie de captura HID", SerializesHidCaptureSeries),
 };
 
 var failures = 0;
@@ -30,6 +32,7 @@ var asyncTests = new (string Name, Func<Task> Run)[]
 {
     ("el puente transmite, reconecta y limpia recursos", BridgeTransmitsReconnectsAndCleansUp),
     ("el puente espera sin crear una salida virtual", BridgeWaitsWithoutCreatingOutput),
+    ("la fuente parseada conserva la capa HID cruda", ParsedSourceUsesRawReports),
 };
 
 foreach (var (name, run) in asyncTests)
@@ -167,6 +170,56 @@ static void MapsDualSenseToXbox()
     HasXboxFlag(result.Buttons, XboxButtons.Start);
     HasXboxFlag(result.Buttons, XboxButtons.Guide);
     Equal(false, result.Buttons.HasFlag(XboxButtons.B));
+}
+
+static void SerializesHidCaptureSeries()
+{
+    var document = new HidCaptureDocument(
+        HidCaptureDocument.CurrentSchemaVersion,
+        "0.1.0",
+        new HidCaptureDevice("054C", "0CE6", "DualSense", 64, "20AABB"),
+        new HidCaptureEnvironment("Windows test", ".NET test"),
+        [
+            new HidActionCapture(
+                "cross_pressed",
+                "Mantén Cross.",
+                ConnectionKind.Usb.ToString(),
+                [
+                    new HidReportSample(10, 1_500, "01", 4, "01020304"),
+                    new HidReportSample(11, 2_500, "01", 4, "01020305"),
+                ])
+        ]);
+
+    var json = JsonSerializer.Serialize(document);
+    var restored = JsonSerializer.Deserialize<HidCaptureDocument>(json)
+        ?? throw new InvalidOperationException("No se pudo restaurar el fixture.");
+
+    Equal(HidCaptureDocument.CurrentSchemaVersion, restored.SchemaVersion);
+    Equal("054C", restored.Device.VendorId);
+    Equal("cross_pressed", restored.Actions[0].Label);
+    Equal(2, restored.Actions[0].Samples.Count);
+    Equal("01020305", restored.Actions[0].Samples[1].BytesHex);
+}
+
+static async Task ParsedSourceUsesRawReports()
+{
+    var report = new byte[64];
+    report[0] = 0x01;
+    report[1] = report[2] = report[3] = report[4] = 128;
+    report[8] = 0x20 | 0x08;
+    var rawSession = new StubRawSession(report);
+    var source = new ParsedControllerInputSource(new StubRawSource(rawSession));
+
+    await using var session = await source.TryConnectAsync()
+        ?? throw new InvalidOperationException("No se creó la sesión parseada.");
+    await using var states = session.ReadStatesAsync().GetAsyncEnumerator();
+    Equal(true, await states.MoveNextAsync());
+    Equal(ConnectionKind.Usb, states.Current.Connection);
+    HasFlag(states.Current.Buttons, GamepadButtons.Cross);
+    Equal(true, rawSession.Disposed is false);
+
+    await session.DisposeAsync();
+    Equal(true, rawSession.Disposed);
 }
 
 static async Task BridgeTransmitsReconnectsAndCleansUp()
@@ -328,6 +381,41 @@ sealed class StubOutput(List<XboxControllerState> submitted, Action? afterSubmit
     public ValueTask DisposeAsync()
     {
         IsConnected = false;
+        Disposed = true;
+        return ValueTask.CompletedTask;
+    }
+}
+
+sealed class StubRawSource(IRawHidReportSession session) : IRawHidReportSource
+{
+    public ValueTask<IRawHidReportSession?> TryConnectAsync(CancellationToken cancellationToken = default) =>
+        ValueTask.FromResult<IRawHidReportSession?>(session);
+}
+
+sealed class StubRawSession(params byte[][] reports) : IRawHidReportSession
+{
+    public RawHidDeviceInfo Device { get; } = new(
+        DualSenseDevice.SonyVendorId,
+        DualSenseDevice.DualSenseProductId,
+        "DualSense de prueba",
+        78,
+        null);
+
+    public bool Disposed { get; private set; }
+
+    public async IAsyncEnumerable<RawHidReport> ReadReportsAsync(
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        for (var index = 0; index < reports.Length; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return new RawHidReport(index, index * 1_000, reports[index]);
+            await Task.Yield();
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
         Disposed = true;
         return ValueTask.CompletedTask;
     }

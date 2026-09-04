@@ -26,9 +26,34 @@ if (args.Contains("--uninstall-driver", StringComparer.OrdinalIgnoreCase))
     return;
 }
 
+if (args.Contains("--capture-hid", StringComparer.OrdinalIgnoreCase))
+{
+    try
+    {
+        Environment.ExitCode = await HidCaptureCommand.RunAsync(
+            args,
+            new HidSharpDualSenseRawReportSource(),
+            shutdown.Token);
+    }
+    catch (OperationCanceledException) when (shutdown.IsCancellationRequested)
+    {
+        Console.WriteLine("\nCaptura cancelada.");
+    }
+    catch (Exception error)
+    {
+        Console.Error.WriteLine($"La captura falló: {error.Message}");
+        Environment.ExitCode = 1;
+    }
+
+    return;
+}
+
 if (args.Contains("--bridge", StringComparer.OrdinalIgnoreCase))
 {
-    await RunBridgeAsync(new HidSharpDualSenseInputSource(), simulated: false, shutdown.Token);
+    await RunBridgeAsync(
+        new ParsedControllerInputSource(new HidSharpDualSenseRawReportSource()),
+        simulated: false,
+        shutdown.Token);
     return;
 }
 

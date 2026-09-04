@@ -51,13 +51,21 @@ public static class DualSenseReportParser
             ParseButtons(buttons0, buttons1, buttons2));
     }
 
-    private static ConnectionKind DetectConnection(ReadOnlySpan<byte> report) => report[0] switch
+    public static ConnectionKind DetectConnection(ReadOnlySpan<byte> report)
     {
-        0x31 => ConnectionKind.BluetoothExtended,
-        0x01 when report.Length >= 60 => ConnectionKind.Usb,
-        0x01 => ConnectionKind.BluetoothBasic,
-        _ => throw new NotSupportedException($"Reporte HID 0x{report[0]:X2} no reconocido."),
-    };
+        if (report.IsEmpty)
+        {
+            throw new ArgumentException("El reporte HID está vacío.", nameof(report));
+        }
+
+        return report[0] switch
+        {
+            0x31 => ConnectionKind.BluetoothExtended,
+            0x01 when report.Length >= 60 => ConnectionKind.Usb,
+            0x01 => ConnectionKind.BluetoothBasic,
+            _ => throw new NotSupportedException($"Reporte HID 0x{report[0]:X2} no reconocido."),
+        };
+    }
 
     private static GamepadButtons ParseButtons(byte buttons0, byte buttons1, byte buttons2)
     {
