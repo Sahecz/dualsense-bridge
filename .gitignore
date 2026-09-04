@@ -1,0 +1,54 @@
+# Build output
+**/bin/
+**/obj/
+artifacts/
+publish/
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+*.trx
+
+# Local SDKs, downloaded tools and caches
+.tools/
+.nuget/
+packages/
+
+# Original throwaway prototype
+prototype-node/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.user
+*.suo
+*.pid
+*.dmp
+*.zip
+
+# IDE and editor state
+.vs/
+.vscode/
+.idea/
+*.DotSettings.user
+
+# Local settings and secrets
+.env
+.env.*
+!.env.example
+secrets.json
+appsettings.Development.json
+*.pfx
+*.p12
+*.key
+*.snk
+
+# OS metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Benchmark output
+BenchmarkDotNet.Artifacts/
